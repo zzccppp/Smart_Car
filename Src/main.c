@@ -29,6 +29,8 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
 /* USER CODE BEGIN PTD */
 uint8_t USART3_RECEIVE_BUFFER[50];
 uint8_t USART3_RECEIVE_BUFFER_SIZE = 45;
@@ -46,8 +48,20 @@ uint16_t start_val_ch2 = 0;
 uint16_t end_val_ch2 = 0;
 uint16_t cnt_ch2 = 0;
 
+uint8_t capture_state_ch3 = 0;
+uint16_t start_val_ch3 = 0;
+uint16_t end_val_ch3 = 0;
+uint16_t cnt_ch3 = 0;
+
+uint8_t capture_state_ch4 = 0;
+uint16_t start_val_ch4 = 0;
+uint16_t end_val_ch4 = 0;
+uint16_t cnt_ch4 = 0;
+
 uint32_t distance_ch1 = 0;
 uint32_t distance_ch2 = 0;
+uint32_t distance_ch3 = 0;
+uint32_t distance_ch4 = 0;
 
 /* USER CODE END PTD */
 
@@ -137,19 +151,68 @@ static void MX_TIM4_Init(void);
 
 void initMotor();
 
+void controlMotor();
+
 void initMotor() {
     HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 500);//speed = 0
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);//speed = 0
     HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 500);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
     HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 500);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
     HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 500);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
 
     //set the motor init state
     HAL_GPIO_WritePin(GPIOF, MOTOR3_IN1_Pin | MOTOR4_IN1_Pin | MOTOR1_IN1_Pin | MOTOR2_IN1_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOF, MOTOR3_IN2_Pin | MOTOR4_IN2_Pin | MOTOR1_IN2_Pin | MOTOR2_IN2_Pin, GPIO_PIN_RESET);
+}
+
+void controlMotor() {
+    uint32_t avg = (distance_ch2 + distance_ch1) / 2;
+
+    if ((distance_ch3 + 5) < avg) {
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN2_Pin | MOTOR4_IN1_Pin | MOTOR1_IN2_Pin | MOTOR2_IN1_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN1_Pin | MOTOR4_IN2_Pin | MOTOR1_IN1_Pin | MOTOR2_IN2_Pin, GPIO_PIN_RESET);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 300);
+        //turn right
+    } else if ((distance_ch4 + 5) < avg) {
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN1_Pin | MOTOR4_IN2_Pin | MOTOR1_IN1_Pin | MOTOR2_IN2_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN2_Pin | MOTOR4_IN1_Pin | MOTOR1_IN2_Pin | MOTOR2_IN1_Pin, GPIO_PIN_RESET);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 300);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 300);
+        //turn left
+    } else {
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN1_Pin | MOTOR4_IN1_Pin | MOTOR1_IN1_Pin | MOTOR2_IN1_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOF, MOTOR3_IN2_Pin | MOTOR4_IN2_Pin | MOTOR1_IN2_Pin | MOTOR2_IN2_Pin, GPIO_PIN_RESET);
+        if (avg > 250) {
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+        } else if (avg < 20) {
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+        } else if (avg >= 20 && avg <= 80) {
+            uint tmp = (25 * avg / 3 - 500 / 3);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, tmp);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, tmp);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, tmp);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, tmp);
+        } else {
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 500);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 500);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 500);
+            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 500);
+        }
+    }
 }
 
 /* USER CODE END 0 */
@@ -234,11 +297,17 @@ int main(void) {
     HAL_UART_Receive_IT(&huart3, USART3_RECEIVE_BUFFER, USART3_RECEIVE_BUFFER_SIZE);
 
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 45000);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 46000);
     HAL_TIM_Base_Start_IT(&htim3);
 
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 46000);
+
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 46000);
+
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 46000);
 
     initMotor();
 
@@ -263,7 +332,7 @@ int main(void) {
                 tmp = 500 - start_val_ch1 + end_val_ch1 + 500 * (cnt_ch1 - 1);
             }
             distance_ch1 = tmp * 17 / 500;
-            Debug_printf("CHANNEL1: %d cm\r\n", distance_ch1);
+            Debug_printf("CHANNEL1=%d\r\n", distance_ch1);
             capture_state_ch1 = 0;
             start_val_ch1 = 0;
             end_val_ch1 = 0;
@@ -283,36 +352,55 @@ int main(void) {
                 tmp = 500 - start_val_ch2 + end_val_ch2 + 500 * (cnt_ch2 - 1);
             }
             distance_ch2 = tmp * 17 / 500;
-            Debug_printf("CHANNEL2: %d cm\r\n", distance_ch2);
+            Debug_printf("CHANNEL2=%d\r\n", distance_ch2);
             capture_state_ch2 = 0;
             start_val_ch2 = 0;
             end_val_ch2 = 0;
             cnt_ch2 = 0;
         }
 
-        uint32_t avg = (distance_ch2 + distance_ch1) / 2;
-        if (avg > 250) {
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-        } else if (avg < 20) {
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-        } else if (avg >= 20 && avg <= 80) {
-            uint tmp = (25 * avg / 3 - 500 / 3);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, tmp);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, tmp);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, tmp);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, tmp);
-        } else {
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 500);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 500);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 500);
-            __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 500);
+        if (capture_state_ch3 == 0) {
+            capture_state_ch3++; // 1-> start capture
+            __HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_RISING);
+            HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3); // 上升沿capture__
+        } else if (capture_state_ch3 == 3) {
+            //计算时间
+            uint32_t tmp;
+            if (cnt_ch3 == 0) {
+                tmp = end_val_ch3 - start_val_ch3;
+            } else {
+                tmp = 500 - start_val_ch3 + end_val_ch3 + 500 * (cnt_ch3 - 1);
+            }
+            distance_ch3 = tmp * 17 / 500;
+            Debug_printf("CHANNEL3=%d\r\n", distance_ch3);
+            capture_state_ch3 = 0;
+            start_val_ch3 = 0;
+            end_val_ch3 = 0;
+            cnt_ch3 = 0;
         }
+
+        if (capture_state_ch4 == 0) {
+            capture_state_ch4++; // 1-> start capture
+            __HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_4, TIM_INPUTCHANNELPOLARITY_RISING);
+            HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_4); // 上升沿capture__
+        } else if (capture_state_ch4 == 3) {
+            //计算时间
+            uint32_t tmp;
+            if (cnt_ch4 == 0) {
+                tmp = end_val_ch4 - start_val_ch4;
+            } else {
+                tmp = 500 - start_val_ch4 + end_val_ch4 + 500 * (cnt_ch4 - 1);
+            }
+            distance_ch4 = tmp * 17 / 500;
+            Debug_printf("CHANNEL4=%d\r\n", distance_ch4);
+            capture_state_ch4 = 0;
+            start_val_ch4 = 0;
+            end_val_ch4 = 0;
+            cnt_ch4 = 0;
+        }
+
+
+        controlMotor();
 
 
         /* USER CODE END WHILE */
@@ -377,7 +465,7 @@ static void MX_TIM1_Init(void) {
 
     /* USER CODE END TIM1_Init 1 */
     htim1.Instance = TIM1;
-    htim1.Init.Prescaler = 719;
+    htim1.Init.Prescaler = 239;
     htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
     htim1.Init.Period = 49999;
     htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -732,6 +820,28 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
                 capture_state_ch2++;// 3->finished
             }
         }
+        if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+            if (capture_state_ch3 == 1) {
+                start_val_ch3 = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_3);
+                __HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_3, TIM_INPUTCHANNELPOLARITY_FALLING);
+                capture_state_ch3++;//3->in capture mode
+            } else if (capture_state_ch3 == 2) {
+                end_val_ch3 = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_3);
+                HAL_TIM_IC_Stop_IT(&htim3, TIM_CHANNEL_3);
+                capture_state_ch3++;// 3->finished
+            }
+        }
+        if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4) {
+            if (capture_state_ch4 == 1) {
+                start_val_ch4 = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
+                __HAL_TIM_SET_CAPTUREPOLARITY(&htim3, TIM_CHANNEL_4, TIM_INPUTCHANNELPOLARITY_FALLING);
+                capture_state_ch4++;//2->in capture mode
+            } else if (capture_state_ch4 == 2) {
+                end_val_ch4 = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
+                HAL_TIM_IC_Stop_IT(&htim3, TIM_CHANNEL_4);
+                capture_state_ch4++;// 3->finished
+            }
+        }
     }
 }
 
@@ -743,6 +853,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         }
         if (capture_state_ch2 == 2) {
             cnt_ch2++;
+        }
+        if (capture_state_ch3 == 2) {
+            cnt_ch3++;
+        }
+        if (capture_state_ch4 == 2) {
+            cnt_ch4++;
         }
     }
 }
@@ -778,3 +894,5 @@ void assert_failed(uint8_t *file, uint32_t line)
 #endif /* USE_FULL_ASSERT */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
+
+#pragma clang diagnostic pop
